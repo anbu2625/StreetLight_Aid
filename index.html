@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreetLight Aid 🚦</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>🚦 StreetLight Aid</h1>
+        <p>Smart Crossing Assistant for the Visually Impaired</p>
+    </header>
+
+    <main>
+        <section id="camera-section">
+            <video id="camera" autoplay playsinline></video>
+            <canvas id="canvas"></canvas>
+            <div id="status">Status: <span id="status-text">Waiting...</span></div>
+        </section>
+
+        <section id="controls">
+            <button id="start-btn">▶ Start Detection</button>
+            <button id="stop-btn" disabled>⏹ Stop</button>
+            <label><input type="checkbox" id="voice" checked> Voice Guidance</label>
+            <label><input type="checkbox" id="vibrate" checked> Haptic Alerts</label>
+        </section>
+
+        <section id="noise-section">
+            <p>Noise Level: <span id="noise-level">0</span> dB</p>
+            <input type="range" id="noise-threshold" min="0" max="100" value="40">
+        </section>
+    </main>
+
+    <footer>
+        <small>Prototype for education. Real deployments need certified hardware & AI models.</small>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

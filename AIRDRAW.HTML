@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Air Draw — Draw in the Air</title>
+  <style>
+    html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,Roboto,Arial}
+    .app{height:100vh;display:grid;grid-template-columns:1fr 300px;background:#0b0b0c;color:#fff}
+    .stage{position:relative;overflow:hidden;background:#000}
+    video#cam{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);opacity:0.15}
+    canvas#draw{position:absolute;inset:0;width:100%;height:100%}
+    .panel{padding:16px;background:#070708;border-left:1px solid rgba(255,255,255,0.04);display:flex;flex-direction:column;gap:12px}
+    h1{font-size:18px;margin:0 0 8px 0}
+    label{font-size:13px;display:flex;flex-direction:column;gap:6px}
+    input[type=range]{width:100%}
+    .row{display:flex;gap:8px}
+    button,select{background:#0f0f10;color:#fff;border:0;padding:8px;border-radius:8px;cursor:pointer}
+    .colors{display:flex;gap:8px}
+    .swatch{width:28px;height:28px;border-radius:6px;cursor:pointer;border:2px solid rgba(255,255,255,0.06)}
+    footer{margin-top:auto;font-size:12px;color:#9aa1ad}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="stage">
+      <video id="cam" autoplay playsinline muted></video>
+      <canvas id="draw"></canvas>
+    </div>
+
+    <aside class="panel">
+      <h1>Air Draw — Controls</h1>
+
+      <label>Brush size
+        <input id="brushSize" type="range" min="1" max="60" value="12">
+      </label>
+
+      <label>Glow intensity
+        <input id="glow" type="range" min="0" max="100" value="40">
+      </label>
+
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>Color palette</div>
+          <button id="eraseBtn">Eraser</button>
+        </div>
+        <div class="colors" style="margin-top:8px">
+          <div class="swatch" data-color="#00ffe7" style="background:#00ffe7"></div>
+          <div class="swatch" data-color="#ff4dff" style="background:#ff4dff"></div>
+          <div class="swatch" data-color="#ffd200" style="background:#ffd200"></div>
+          <div class="swatch" data-color="#ffffff" style="background:#ffffff"></div>
+          <div class="swatch" data-color="#ff6b3a" style="background:#ff6b3a"></div>
+        </div>
+      </div>
+
+      <label style="margin-top:8px">Effect
+        <select id="effect">
+          <option value="neon">Neon (default)</option>
+          <option value="sparkles">Sparkles</option>
+          <option value="trail">Soft trail</option>
+        </select>
+      </label>
+
+      <div class="row">
+        <button id="clear">Clear</button>
+        <button id="save">Save PNG</button>
+      </div>
+
+      <div style="margin-top:10px;font-size:13px;color:#9aa1ad">
+        Tip: make a loose fist and extend just your index finger. The app tracks the tip of the index finger.
+      </div>
+
+      <footer>Built with MediaPipe Hands + Canvas API</footer>
+    </aside>
+  </div>
+
+  <!-- MediaPipe Hands + Camera utils -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+  <script>
+    // Elements
+    const video = document.getElementById('cam');
+    const canvas = document.getElementById('draw');
+    const ctx = canvas.getContext('2d');
+    const brushSizeEl = document.getElementById('brushSize');
+    const glowEl = document.getElementById('glow');
+    const clearBtn = document.getElementById('clear');
+    const saveBtn = document.getElementById('save');
+    const swatches = document.querySelectorAll('.swatch');
+    const effectSel = document.getElementById('effect');
+    const eraseBtn = document.getElementById('eraseBtn');
+
+    // State
+    let width = 1280, height = 720;
+    let drawing = [];// array of {x,y,pressure,ts,color}
+    let lastPoint = null;
+    let currentColor = '#00ffe7';
+    let isErasing = false;
+
+    // Resize canvas to fill stage
+    function resize() {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+      width = canvas.width;
+      height = canvas.height;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // initialize color swatches
+    swatches.forEach(s => s.addEventListener('click', e=>{
+      currentColor = s.dataset.color;
+      isErasing = false;
+    }));
+    eraseBtn.addEventListener('click', ()=>{ isErasing = true; });
+
+    // Clear canvas & data
+    clearBtn.addEventListener('click', ()=>{ drawing = []; clearCanvas(); });
+    saveBtn.addEventListener('click', ()=>{
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a'); a.href = url; a.download = 'air-draw.png'; a.click();
+    });
+
+    function clearCanvas(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+    }
+
+    // Particle utility for sparkles
+    class Spark {
+      constructor(x,y,color){ this.x=x;this.y=y;this.vx=(Math.random()-0.5)*2;this.vy=(Math.random()-0.5)*2;this.life=30;this.color=color; }
+      step(){ this.x+=this.vx; this.y+=this.vy; this.vy+=0.05; this.life--; }
+      draw(ctx){ if(this.life<=0) return; ctx.globalAlpha = Math.max(0, this.life/30); ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x,this.y, Math.max(0, (this.life/30)*3),0,Math.PI*2); ctx.fill(); ctx.globalAlpha = 1; }
+    }
+    const sparks = [];
+
+    // Drawing loop
+    function render(){
+      // subtle fade for trail effects
+      const effect = effectSel.value;
+      if(effect === 'trail'){
+        ctx.fillStyle = 'rgba(0,0,0,0.06)';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+      } else {
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+      }
+
+      // draw strokes
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+
+      for(let i=1;i<drawing.length;i++){
+        const a = drawing[i-1];
+        const b = drawing[i];
+        if(!a || !b) continue;
+        ctx.beginPath();
+        const size = (a.size + b.size)/2;
+        ctx.lineWidth = size;
+        ctx.strokeStyle = b.color;
+
+        // glow
+        const glow = parseInt(glowEl.value,10);
+        ctx.shadowBlur = glow/2;
+        ctx.shadowColor = b.color;
+
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // sparkles
+        if(effect==='sparkles' && Math.random() < 0.15){ sparks.push(new Spark(b.x,b.y,b.color)); }
+      }
+
+      // draw sparks
+      for(let i=sparks.length-1;i>=0;i--){ sparks[i].step(); sparks[i].draw(ctx); if(sparks[i].life<=0) sparks.splice(i,1); }
+
+      requestAnimationFrame(render);
+    }
+    requestAnimationFrame(render);
+
+    // Smooth points with simple lerp
+    function lerp(a,b,t){ return a + (b-a)*t; }
+
+    function addPoint(x,y,size,color){
+      const now = performance.now();
+      if(lastPoint){
+        const dx = x-lastPoint.x; const dy = y-lastPoint.y; const dist = Math.hypot(dx,dy);
+        if(dist < 0.5) return; // skip tiny movements
+      }
+      const point = {x,y,size,ts:now,color};
+      drawing.push(point);
+      lastPoint = point;
+
+      // limit length
+      if(drawing.length > 5000) drawing.splice(0,drawing.length-4000);
+    }
+
+    // Map MediaPipe normalized coordinates (0..1) to canvas coords (mirrored horizontally)
+    function toCanvasCoords(normX, normY){
+      // MediaPipe coordinates: x=0 left of image, y=0 top
+      // video is mirrored for user, so flip x
+      const x = canvas.width - (normX * canvas.width);
+      const y = normY * canvas.height;
+      return {x,y};
+    }
+
+    // Setup MediaPipe Hands
+    const hands = new Hands({locateFile: (file) => {
+      return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+    }});
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.7,
+      minTrackingConfidence: 0.6
+    });
+
+    hands.onResults(onResults);
+
+    // Use the Camera helper to capture frames
+    const camera = new Camera(video, {
+      onFrame: async () => { await hands.send({image: video}); },
+      width: 1280,
+      height: 720
+    });
+    camera.start();
+
+    function onResults(results){
+      // if no hands detected, push a gap to stop lines
+      if(!results.multiHandLandmarks || results.multiHandLandmarks.length === 0){ lastPoint = null; drawing.push(null); return; }
+
+      const lm = results.multiHandLandmarks[0];
+      const idx = lm[8]; // index finger tip
+      const p = toCanvasCoords(idx.x, idx.y);
+
+      // smoothing against last drawn point
+      let px = p.x, py = p.y;
+      if(lastPoint){ px = lerp(lastPoint.x, p.x, 0.35); py = lerp(lastPoint.y, p.y, 0.35); }
+
+      const size = parseInt(brushSizeEl.value,10);
+      const color = isErasing ? '#000000' : currentColor;
+      addPoint(px, py, size, color);
+    }
+
+    // Draw from drawing array to a secondary buffer so we keep high-quality strokes while supporting trails
+    // (render() already draws from drawing array)
+
+    // Make sure camera video keeps the same aspect ratio as canvas, but we use video only for detection and subtle background
+
+    // small UI: let user change options while running
+    brushSizeEl.addEventListener('input', ()=>{});
+    glowEl.addEventListener('input', ()=>{});
+    effectSel.addEventListener('change', ()=>{ if(effectSel.value==='neon'){} });
+
+    // handle page visibility
+    document.addEventListener('visibilitychange', ()=>{ if(document.hidden) camera.stop(); else camera.start(); });
+
+    // make sure we resize canvas initially after video has metadata
+    video.addEventListener('loadedmetadata', ()=>{ resize(); });
+  </script>
+</body>
+</html>
