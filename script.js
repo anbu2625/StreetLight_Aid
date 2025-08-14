@@ -1,101 +1,76 @@
+// Camera traffic light detection
 const video = document.getElementById('camera');
 const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-const statusText = document.getElementById('status-text');
-const startBtn = document.getElementById('start-btn');
-const stopBtn = document.getElementById('stop-btn');
-const voiceCheck = document.getElementById('voice');
-const vibrateCheck = document.getElementById('vibrate');
-const noiseLevelDisplay = document.getElementById('noise-level');
-const noiseThreshold = document.getElementById('noise-threshold');
+const statusEl = document.getElementById('status');
 
-let detectionInterval;
-let audioStream;
-let analyser, microphone, dataArray;
+let lastSpoken = "";
 
-startBtn.addEventListener('click', startDetection);
-stopBtn.addEventListener('click', stopDetection);
-
-function startDetection() {
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+if (video && canvas && statusEl) {
+  navigator.mediaDevices.getUserMedia({ video: true })
     .then(stream => {
-        video.srcObject = stream;
-        audioStream = stream;
+      video.srcObject = stream;
+      const ctx = canvas.getContext('2d');
 
-        const audioContext = new AudioContext();
-        analyser = audioContext.createAnalyser();
-        microphone = audioContext.createMediaStreamSource(stream);
-        microphone.connect(analyser);
-        dataArray = new Uint8Array(analyser.frequencyBinCount);
+      setInterval(() => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
 
-        detectionInterval = setInterval(detectLightAndNoise, 500);
-        startBtn.disabled = true;
-        stopBtn.disabled = false;
+        // Detection box
+        const boxX = video.videoWidth / 2 - 50;
+        const boxY = video.videoHeight / 2 - 50;
+        const boxW = 100;
+        const boxH = 100;
+        ctx.strokeStyle = "yellow";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(boxX, boxY, boxW, boxH);
+
+        const imageData = ctx.getImageData(boxX, boxY, boxW, boxH);
+        const avgColor = getAverageColor(imageData.data);
+
+        let detected = "";
+        if (avgColor.r > 150 && avgColor.g < 100) detected = "RED light - Stop";
+        else if (avgColor.g > 150 && avgColor.r < 100) detected = "GREEN light - Go";
+        else if (avgColor.r > 200 && avgColor.g > 200 && avgColor.b < 100) detected = "YELLOW light - Wait";
+
+        if (detected) {
+          statusEl.textContent = detected;
+          if (detected !== lastSpoken) {
+            speak(detected);
+            lastSpoken = detected;
+          }
+        } else {
+          statusEl.textContent = "No clear traffic light detected";
+        }
+      }, 1000);
     })
-    .catch(err => {
-        alert("Error: " + err);
-    });
+    .catch(err => alert("Camera access denied: " + err));
 }
 
-function stopDetection() {
-    clearInterval(detectionInterval);
-    if (audioStream) {
-        audioStream.getTracks().forEach(track => track.stop());
-    }
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
-    statusText.textContent = "Stopped";
-    statusText.style.color = "#fff";
+// Helper: average RGB
+function getAverageColor(data) {
+  let r = 0, g = 0, b = 0, count = data.length / 4;
+  for (let i = 0; i < data.length; i += 4) {
+    r += data[i];
+    g += data[i + 1];
+    b += data[i + 2];
+  }
+  return { r: r / count, g: g / count, b: b / count };
 }
 
-function detectLightAndNoise() {
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const pixels = frame.data;
+// Speak text
+function speak(text) {
+  const msg = new SpeechSynthesisUtterance(text);
+  msg.lang = "en-IN";
+  window.speechSynthesis.speak(msg);
+}
 
-    let redCount = 0, greenCount = 0, yellowCount = 0;
-
-    for (let i = 0; i < pixels.length; i += 4) {
-        const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
-        if (r > 150 && g < 100 && b < 100) redCount++;
-        if (g > 150 && r < 100 && b < 100) greenCount++;
-        if (r > 150 && g > 150 && b < 100) yellowCount++;
-    }
-
-    let detected = "Unknown";
-    let color = "#ff0";
-
-    if (redCount > greenCount && redCount > yellowCount) {
-        detected = "STOP - Red Light";
-        color = "red";
-    } else if (greenCount > redCount && greenCount > yellowCount) {
-        detected = "GO - Green Light";
-        color = "lime";
-    } else if (yellowCount > redCount && yellowCount > greenCount) {
-        detected = "CAUTION - Yellow Light";
-        color = "yellow";
-    }
-
-    statusText.textContent = detected;
-    statusText.style.color = color;
-
-    // Noise Detection
-    analyser.getByteFrequencyData(dataArray);
-    let values = 0;
-    for (let i = 0; i < dataArray.length; i++) values += dataArray[i];
-    let average = values / dataArray.length;
-    noiseLevelDisplay.textContent = average.toFixed(1);
-
-    if (average > noiseThreshold.value) {
-        console.log("High noise detected");
-    }
-
-    // Voice + Haptic Feedback
-    if (voiceCheck.checked) {
-        const utterance = new SpeechSynthesisUtterance(detected);
-        speechSynthesis.speak(utterance);
-    }
-    if (vibrateCheck.checked && navigator.vibrate) {
-        navigator.vibrate([200]);
-    }
+// Contact form logic
+const contactForm = document.getElementById('contactForm');
+if (contactForm) {
+  contactForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    document.getElementById('thankYouMsg').classList.remove('hidden');
+    contactForm.reset();
+  });
 }
