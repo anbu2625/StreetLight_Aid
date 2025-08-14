@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DOM Activities Side-by-Side</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+    display: flex;
+    gap: 40px;
+    background: #fafafa;
+  }
+  section {
+    flex: 1;
+    border: 1px solid #ccc;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    background: white;
+  }
+  h2 {
+    text-align: center;
+    margin-bottom: 15px;
+  }
+  .container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .card, .profile-card {
+    background: lightblue;
+    padding: 15px;
+    border-radius: 8px;
+    width: 150px;
+    text-align: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .profile-card {
+    background: #f0f0f0;
+    width: 180px;
+  }
+  /* Hover animation */
+  .card:hover, .profile-card:hover {
+    transform: translateY(-5px) scale(1.05);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  }
+  button {
+    background: dodgerblue;
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background 0.2s ease;
+  }
+  button:hover {
+    background: royalblue;
+  }
+  .delete-btn, .remove-btn {
+    background: crimson;
+    margin-top: 10px;
+  }
+  .delete-btn:hover, .remove-btn:hover {
+    background: darkred;
+  }
+</style>
+</head>
+<body>
+
+<!-- Create Card Section -->
+<section>
+  <h2>Create Card</h2>
+  <button id="createCardBtn">Create Card</button>
+  <div id="cardContainer" class="container"></div>
+</section>
+
+<!-- Add Profile Section -->
+<section>
+  <h2>Add Profile</h2>
+  <button id="addProfileBtn">Add Profile</button>
+  <div id="profileContainer" class="container"></div>
+</section>
+
+<!-- Load modules -->
+<script type="module">
+  import { initCreateCard } from './createCard.js';
+  import { initProfileCard } from './profileCard.js';
+
+  initCreateCard("cardContainer", "createCardBtn");
+  initProfileCard("profileContainer", "addProfileBtn");
+</script>
+
+</body>
+</html>
