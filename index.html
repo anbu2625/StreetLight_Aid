@@ -15,6 +15,7 @@
     </ul>
   </nav>
 
+  <!-- Camera Section -->
   <section class="hero">
     <h2>Helping the Visually Impaired at Crosswalks</h2>
     <p>Real-time traffic light detection with voice assistance.</p>
@@ -23,6 +24,21 @@
     <p id="status">Detecting...</p>
   </section>
 
-  <script src="script.js"></script>
+  <!-- Generic Card Creator -->
+  <section class="section-container card-creator">
+    <h2>Create Generic Cards</h2>
+    <button id="createCardBtn">Create Card</button>
+    <div id="cardContainer"></div>
+  </section>
+
+  <!-- Profile Card Creator -->
+  <section class="section-container profile-cards">
+    <h2>Interactive Profile Cards</h2>
+    <button id="addProfileBtn">Add Profile</button>
+    <div id="profileContainer"></div>
+  </section>
+
+  <script src="script.js"></script> <!-- Camera & contact logic -->
+  <script src="main.js" type="module"></script> <!-- DOM & ES6 modules -->
 </body>
 </html>

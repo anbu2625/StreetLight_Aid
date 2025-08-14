@@ -54,6 +54,65 @@ video, canvas {
   margin-top: 1rem;
 }
 
+/* Sections */
+.section-container {
+  max-width: 600px;
+  margin: 3rem auto;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+.section-container h2 {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+/* Buttons */
+button {
+  display: block;
+  margin: 0.5rem auto 1rem auto;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 5px;
+  background-color: var(--secondary-color);
+  color: var(--text-color);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+button:hover {
+  background-color: var(--hover-color);
+}
+
+/* Cards */
+.card, .profile-card {
+  padding: 1rem;
+  margin: 0.5rem 0;
+  border-radius: 8px;
+  position: relative;
+  background: rgba(255, 255, 255, 0.2);
+  animation: fadeIn 0.5s ease forwards;
+}
+
+.card button, .profile-card button {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background-color: red;
+  color: #fff;
+  border-radius: 3px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+.card button:hover, .profile-card button:hover {
+  background-color: darkred;
+}
+
+/* Contact Form */
 .contact-form {
   max-width: 500px;
   margin: 5rem auto;
@@ -77,8 +136,21 @@ video, canvas {
   display: none;
 }
 
+/* Animation */
+@keyframes fadeIn {
+  0% { opacity: 0; transform: translateY(-10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive */
 @media (max-width: 600px) {
   .navbar {
     flex-direction: column;
+  }
+  .section-container {
+    margin: 2rem 1rem;
+  }
+  button {
+    width: 90%;
   }
 }
